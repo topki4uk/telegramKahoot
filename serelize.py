@@ -1,36 +1,51 @@
+import json
+
+
+class Task:
+    def __init__(self, question, options, correct_answer):
+        self.question = question
+        self.options = options
+        self.correct_answer = correct_answer
+
+    def __iter__(self):
+        return iter(self.options)
+
+
 class KHTFile:
     def __init__(self, file):
-        self.file = file
-        self.tasks = {
-            'questions': []
-        }
+        self.file = json.loads(file)
+        self.tasks = []
 
-        title, *tasks = file.split('-'*20)
-        self.tasks['title'] = title[title.index(':')+1:].strip()
+        self.title = self.file['title']
 
-        for task in tasks:
-            question, *answers = task.strip().split('\n')
-            question = question[question.index(':')+1:].strip()
-            question_dict = {
-                'question': question,
-                'answers': {}
-            }
+        for task in self.file['questions']:
+            question = task['question']
+            options = task['options']
+            answer = task['answer']
 
-            for answer in answers:
-                q = answer[answer.index(':')+1:answer.index('->')-1].strip()
-                a = True if answer[answer.index('->')+2:].strip() == 'T' else False
-                question_dict['answers'][q] = a
+            task_dict = Task(question, options, answer)
+            self.tasks.append(task_dict)
 
-            self.tasks['questions'].append(question_dict)
+    def __setattr__(self, key, value):
+        self.__dict__[key] = value
 
-    def __getitem__(self, item):
-        return self.tasks[item]
+    def __iter__(self):
+        return iter(self.tasks)
+
+    def __len__(self):
+        return len(self.tasks)
 
 
 def main():
-    with open(r'kht_files/quiz.kht', 'r') as file:
+    with open(r'quiz.json', 'r', encoding='utf8') as file:
         kht = KHTFile(file.read())
-        print(kht['questions'])
+        print(kht.title)
+
+        for n, task in enumerate(kht):
+            print(f'{n+1}. {task.question}')
+            for i, answer in enumerate(task.options):
+                print(f'{i+1}. {answer}')
+            print(f'Правильный ответ: {task.correct_answer}')
 
 
 if __name__ == '__main__':

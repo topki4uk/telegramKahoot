@@ -1,4 +1,6 @@
-from telebot import TeleBot
+import time
+
+from telebot import TeleBot, types
 from random import randint
 from fnmatch import fnmatch
 from sessions import Session, User
@@ -12,7 +14,16 @@ sessions = []
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    bot.send_message(message.chat.id, "Привет ✌️ ")
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+    create = types.KeyboardButton("/create_session")
+    add_file_button = types.KeyboardButton('/set_file')
+    join_button = types.KeyboardButton('/join_session')
+    start_game_button = types.KeyboardButton('/start_game')
+
+    markup.add(create, add_file_button, join_button, start_game_button)
+
+    bot.send_message(message.chat.id, "Привет ✌️", reply_markup=markup)
 
 
 @bot.message_handler(commands=['function'])
@@ -111,24 +122,74 @@ def start_game(message):
         bot.send_message(message.chat.id, 'Не найдены активные сессии!')
         return
 
-    for gamer in session:
-        bot.send_message(gamer.user_id, 'Kot')
+    for num, task in enumerate(session.kahoot_file):
+        string_message = f'Вопрос {num+1}/{len(session.kahoot_file)}.\n'
+        string_message += f'{task.question}\n'
+
+        for i, option in enumerate(task.options):
+            string_message += f'    {i+1}. {option}\n'
+
+        for gamer in session:
+
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            buttons = [
+                types.KeyboardButton(char) for char in '🔺⚫⬜🔷'
+            ]
+            markup.add(*buttons)
+
+            with open(r'10-seconds.gif', 'rb') as file:
+                bot.send_animation(gamer.user_id, file)
+
+            msg = bot.send_message(gamer.user_id, string_message, reply_markup=markup)
+            bot.register_next_step_handler(msg, set_answer)
+
+        time.sleep(10)
+
+
+def set_answer(message):
+    if message.text == '🔺':
+        ...
+    elif message.text == '⚫':
+        ...
+    elif message.text == '⬜':
+        ...
+    elif message.text == '🔷':
+        ...
 
 
 @bot.message_handler(commands=['set_file'], content_types=['text', ])
 def set_test_file(message):
-    msg = bot.send_message(message.chat.id, 'Пришлите файл с расширением .kht для вашей игры.')
+    msg = bot.send_message(message.chat.id, 'Пришлите файл с расширением .json для вашей игры.')
     bot.register_next_step_handler(msg, send_file)
 
 
 def send_file(message):
     resp = message.document
+
+    if 'json' not in str(resp.file_name).rsplit('.', maxsplit=1):
+        bot.send_message(message.chat.id, 'Неверное расширение файла!')
+        return
+
+    admin = User(
+        message.from_user.id,
+        'Admin',
+        f'{message.from_user.last_name} {message.from_user.first_name}'
+    )
+
+    session = admin.find_session(sessions)
+
+    if session is None:
+        bot.send_message(message.chat.id, 'Не найдены активные сессии!')
+        return
+
     file = bot.get_file(resp.file_id)
-    download_file = bot.download_file(file.file_path)
+    kahoot_file = bot.download_file(file.file_path).decode('utf8')
+    session.kahoot_file = KHTFile(kahoot_file)
 
-    kht = KHTFile(download_file.decode('utf8'))
-
-    bot.send_message(message.chat.id, str(kht.tasks))
+    bot.send_message(message.chat.id, 'Файл успешно загружен!')
+    bot.send_message(message.chat.id,
+                     f'''Название файла: {session.kahoot_file.title}\nКоличество вопросов: {len(session.kahoot_file)}'''
+                     )
 
 
 bot.polling(none_stop=True)

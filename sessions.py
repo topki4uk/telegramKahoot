@@ -1,9 +1,12 @@
 from random import randint
+import time
+import threading
 
 
 class User:
     def __init__(self, user_id, status, name):
         self.user_id = user_id
+        self.msg = None
         self.status = status
         self.name = name
 
@@ -28,6 +31,9 @@ class Session:
     ):
         self.session_id = session_id
         self.admin = admin
+        self.kahoot_file = None
+
+        self.time = 0
 
         if gamer_list is None:
             self.gamer_list = []
@@ -37,6 +43,15 @@ class Session:
     def __add__(self, other):
         self.gamer_list.append(other)
         return self
+
+    def timer(self, n):
+        self.time = n
+        t_start = time.time()
+        current_t = time.time()
+
+        while int(current_t - t_start) < n:
+            current_t = time.time()
+            self.time = n - int(current_t - t_start)
 
     def __getitem__(self, item):
         return self.gamer_list[item]
