@@ -13,6 +13,11 @@ class User:
     def __eq__(self, other):
         return True if (self.user_id == other.user_id) else False
 
+    def find_session(self, sessions):
+        for session in sessions:
+            if str(session.admin) == str(self.user_id):
+                return session
+
 
 class Session:
     def __init__(
