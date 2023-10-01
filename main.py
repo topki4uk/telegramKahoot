@@ -1,13 +1,17 @@
+import threading
 import time
 
 from telebot import TeleBot, types
 from random import randint
 from fnmatch import fnmatch
-from sessions import Session, User
+from sessions import Session
 from serelize import KHTFile
 import os
 
+from users import Gamer, Admin
+
 token = os.environ.get('TELEGRAM_TOKEN')
+SYMBOLS = '🔺⚫⬜🔷'
 bot = TeleBot(token)
 sessions = []
 
@@ -17,11 +21,13 @@ def start_message(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
     create = types.KeyboardButton("/create_session")
+    session_info_button = types.KeyboardButton('/get_session_info')
     add_file_button = types.KeyboardButton('/set_file')
     join_button = types.KeyboardButton('/join_session')
     start_game_button = types.KeyboardButton('/start_game')
 
-    markup.add(create, add_file_button, join_button, start_game_button)
+    markup.add(create, add_file_button, join_button,
+               start_game_button, session_info_button)
 
     bot.send_message(message.chat.id, "Привет ✌️", reply_markup=markup)
 
@@ -33,19 +39,14 @@ def some_message(message):
 
 @bot.message_handler(commands=['create_session'])
 def create_session(message):
-    user_id = str(message.from_user.id)
+    admin = Admin(message)
 
     for session in sessions:
-        if str(session.admin) == user_id:
+        if session.admin == admin:
             bot.send_message(message.chat.id, 'Ваша сессия уже существует!')
             return
 
     session_id = f'{randint(100, 999)}-{randint(100, 999)}-{randint(100, 999)}'
-    admin = User(
-        message.from_user.id,
-        'ADMIN',
-        user_id
-    )
     session = Session(session_id, admin)
     sessions.append(session)
 
@@ -57,20 +58,17 @@ def create_session(message):
 
 @bot.message_handler(commands=['get_session_info'])
 def session_info(message):
-    user = User(
-        message.from_user.id,
-        'Admin',
-        f'{message.from_user.last_name} {message.from_user.first_name}'
-    )
+    admin = Admin(message)
 
     session_info_message = ''
-    session = user.find_session(sessions)
+    session = admin.find_session(sessions)
 
     if session is None:
         bot.send_message(message.chat.id, 'У вас нет активных сессий!')
         return
 
     session_info_message += f'Номер сессии: {session.session_id}\n'
+    session_info_message += f'Админ сессии: {session.admin}\n\n'
     session_info_message += f'Список игроков:\n'
 
     for gamers in session:
@@ -87,17 +85,16 @@ def join_session(message):
 
 def input_session_id(message):
     resp = message.text
-    user_id = str(message.from_user.id)
 
     if fnmatch(str(resp), '???-???-???'):
         for session in sessions:
             if session.session_id == str(resp):
-                user = User(user_id, 'Gamer', user_id)
-                if user in session.gamer_list:
+                gamer = Gamer(message)
+                if gamer in session.gamer_list:
                     bot.send_message(message.chat.id, 'Вы уже подключены к сессии!')
                     return
 
-                session += user
+                session += gamer
                 bot.send_message(message.chat.id, 'Подключение произошло успешно!')
                 return
         else:
@@ -110,11 +107,7 @@ def input_session_id(message):
 
 @bot.message_handler(commands=['start_game'])
 def start_game(message):
-    admin = User(
-        message.from_user.id,
-        'Admin',
-        f'{message.from_user.last_name} {message.from_user.first_name}'
-    )
+    admin = Admin(message)
 
     session = admin.find_session(sessions)
 
@@ -122,39 +115,8 @@ def start_game(message):
         bot.send_message(message.chat.id, 'Не найдены активные сессии!')
         return
 
-    for num, task in enumerate(session.kahoot_file):
-        string_message = f'Вопрос {num+1}/{len(session.kahoot_file)}.\n'
-        string_message += f'{task.question}\n'
-
-        for i, option in enumerate(task.options):
-            string_message += f'    {i+1}. {option}\n'
-
-        for gamer in session:
-
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-            buttons = [
-                types.KeyboardButton(char) for char in '🔺⚫⬜🔷'
-            ]
-            markup.add(*buttons)
-
-            with open(r'10-seconds.gif', 'rb') as file:
-                bot.send_animation(gamer.user_id, file)
-
-            msg = bot.send_message(gamer.user_id, string_message, reply_markup=markup)
-            bot.register_next_step_handler(msg, set_answer)
-
-        time.sleep(10)
-
-
-def set_answer(message):
-    if message.text == '🔺':
-        ...
-    elif message.text == '⚫':
-        ...
-    elif message.text == '⬜':
-        ...
-    elif message.text == '🔷':
-        ...
+    game_thread = threading.Thread(target=session.start_game, args=(bot, message, ))
+    game_thread.start()
 
 
 @bot.message_handler(commands=['set_file'], content_types=['text', ])
@@ -170,11 +132,7 @@ def send_file(message):
         bot.send_message(message.chat.id, 'Неверное расширение файла!')
         return
 
-    admin = User(
-        message.from_user.id,
-        'Admin',
-        f'{message.from_user.last_name} {message.from_user.first_name}'
-    )
+    admin = Admin(message)
 
     session = admin.find_session(sessions)
 
