@@ -60,7 +60,9 @@ class Session:
                 bot.send_animation(message.chat.id, file)
 
             for sym, option in options.items():
-                string_message += f'    {sym}   {option}\n'
+                string_message += f'    {sym} {option}\n'
+
+            bot.send_message(self.admin.user_id, string_message)
 
             for gamer in self:
                 msg = bot.send_message(gamer.user_id, string_message, reply_markup=gamer_markup)
@@ -76,9 +78,15 @@ class Session:
                 true_answer_string += f'За {option} ({sym}) проголосовали {stats}\n'
 
             msg_admin = bot.send_message(self.admin.user_id, true_answer_string)
-            ans = threading.Event()
-            bot.register_next_step_handler(msg_admin, next_question, session=self, e=ans)
-            ans.wait()
+
+            admin_action_waiting_event = threading.Event()
+
+            bot.register_next_step_handler(
+                msg_admin,
+                next_question,
+                event=admin_action_waiting_event
+            )
+            admin_action_waiting_event.wait()
 
 
 def main():
