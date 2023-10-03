@@ -18,6 +18,7 @@ class Session:
         self.session_id = session_id
         self.admin = admin
         self.kahoot_file = None
+        self.question_area = None
 
         self.wait = False
 
@@ -51,41 +52,62 @@ class Session:
         gamer_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         gamer_markup.add(*[types.InlineKeyboardButton(char) for char in SYMBOLS])
 
+        start_msg = None
+        for gamer in self:
+            start_msg = bot.send_message(gamer.user_id, 'Игра началась!', reply_markup=gamer_markup)
+            bot.register_next_step_handler(start_msg, set_answer, gamer=gamer)
+
         for num, task in enumerate(self.kahoot_file):
             string_message = f'Вопрос {num + 1}/{len(self.kahoot_file)}.\n'
             string_message += f'{task.question}\n'
             options = dict(zip(SYMBOLS, task.options))
 
-            with open(r'10-seconds.gif', 'rb') as file:
-                bot.send_animation(message.chat.id, file)
-
             for sym, option in options.items():
                 string_message += f'    {sym} {option}\n'
 
-            bot.send_message(self.admin.user_id, string_message)
+            if self.question_area is None:
+                question_message = bot.send_message(self.admin.user_id, string_message)
+                self.question_area = question_message.message_id
+            else:
+                bot.edit_message_text(
+                    text=string_message,
+                    chat_id=message.chat.id,
+                    message_id=self.question_area
+                )
 
             for gamer in self:
-                msg = bot.send_message(gamer.user_id, string_message, reply_markup=gamer_markup)
-                bot.register_next_step_handler(msg, set_answer, options=options, gamer=gamer)
+                bot.register_next_step_handler(start_msg, set_answer, gamer=gamer)
 
-            time.sleep(10)
+            start_time = time.time()
+            out_time = 10
 
-            answers = [gamer.selected_option for gamer in self.gamer_list]
+            while time.time() - start_time <= 10:
+                if out_time != (10 - int(time.time() - start_time)):
+                    out_time = 10 - int(time.time() - start_time)
+                    bot.edit_message_text(
+                        text=f'{string_message}\nОставшееся время: {out_time}',
+                        chat_id=message.chat.id,
+                        message_id=self.question_area
+                    )
+
+            answers = [options[gamer.selected_option] for gamer in self.gamer_list]
             true_answer_string = f'Правильный ответ: {task.correct_answer}\n'
 
             for sym, option in options.items():
                 stats = answers.count(option)
                 true_answer_string += f'За {option} ({sym}) проголосовали {stats}\n'
 
-            msg_admin = bot.send_message(self.admin.user_id, true_answer_string)
-
             admin_action_waiting_event = threading.Event()
+            self.admin.event = admin_action_waiting_event
+            self.admin.create_keyboard()
 
-            bot.register_next_step_handler(
-                msg_admin,
-                next_question,
-                event=admin_action_waiting_event
+            bot.edit_message_text(
+                text=f'{string_message}\n\n{true_answer_string}',
+                chat_id=message.chat.id,
+                message_id=self.question_area,
+                reply_markup=self.admin.keyboard,
             )
+
             admin_action_waiting_event.wait()
 
 

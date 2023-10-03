@@ -1,3 +1,8 @@
+import telebot
+
+from next_step_handlers import next_question
+
+
 class User (object):
     def __init__(self, message):
         self.user_id = message.from_user.id
@@ -24,6 +29,18 @@ class Admin (User):
     def __init__(self, message):
         super().__init__(message)
         self.status = 'ADMIN'
+        self.event = None
+        self.button_data = {
+            'Следующий вопрос': 'next',
+        }
+
+    def create_keyboard(self):
+        self.keyboard = telebot.types.InlineKeyboardMarkup()
+        button = telebot.types.InlineKeyboardButton('Следующий вопрос', callback_data='text')
+        j_button = {**button.to_dict(), 'event': id(self.event)}
+        self.keyboard.add(
+            telebot.types.InlineKeyboardButton().de_json(j_button)
+        )
 
 
 class Gamer (User):

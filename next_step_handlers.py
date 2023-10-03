@@ -1,10 +1,12 @@
-def set_answer(message, options, gamer):
-    for sym, option in options.items():
+SYMBOLS = '🔺⚫⬜🔷'
+
+
+def set_answer(message, gamer):
+    for sym in SYMBOLS:
         if message.text == sym:
-            gamer.selected_option = option
+            gamer.selected_option = sym
 
 
 def next_question(message, event):
-    print(message.text)
     if message.text == '/next':
         event.set()

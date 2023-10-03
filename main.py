@@ -1,12 +1,14 @@
 import threading
-import time
 
+import telebot.types
 from telebot import TeleBot, types
 from random import randint
 from fnmatch import fnmatch
+
 from sessions import Session
 from serelize import KHTFile
 import os
+import ctypes
 
 from users import Gamer, Admin
 
@@ -119,8 +121,14 @@ def start_game(message):
     game_thread.start()
 
 
+@bot.callback_query_handler(func=lambda q: q.data == 'text')
+def next_question(callback_query: telebot.types.CallbackQuery):
+    # ctypes.cast(int(callback_query.), ctypes.py_object).value.set()
+    ...
+
+
 @bot.message_handler(commands=['set_file'], content_types=['text', ])
-def set_test_file(message):
+def set_test_file(message: telebot.types.Message):
     msg = bot.send_message(message.chat.id, 'Пришлите файл с расширением .json для вашей игры.')
     bot.register_next_step_handler(msg, send_file)
 
