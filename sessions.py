@@ -60,31 +60,33 @@ class Session:
         gamer_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         gamer_markup.add(*[types.InlineKeyboardButton(char) for char in SYMBOLS])
 
-        start_msg = None
         for gamer in self:
-            start_msg = bot.send_message(gamer.user_id, 'Игра началась!', reply_markup=gamer_markup)
-            bot.register_next_step_handler(start_msg, set_answer, gamer=gamer)
+            msg = bot.send_message(gamer.user_id, 'Игра началась!', reply_markup=gamer_markup)
+            gamer.msg = msg
+            bot.register_next_step_handler(msg, set_answer, gamer=gamer)
 
         for num, task in enumerate(self.kahoot_file):
-            string_message = f'Вопрос {num + 1}/{len(self.kahoot_file)}.\n'
-            string_message += f'{task.question}\n'
+            message_header = f'Вопрос {num + 1}/{len(self.kahoot_file)}. (0/{len(self.gamer_list)}) \n'
+            message_question = f'{task.question}\n'
             options = dict(zip(SYMBOLS, task.options))
 
+            message_body = ''
             for sym, option in options.items():
-                string_message += f'    {sym} {option}\n'
+                message_body += f'    {sym} {option}\n'
 
+            message_text = message_header + message_question + message_body
             if self.question_area is None:
-                question_message = bot.send_message(self.admin.user_id, string_message)
+                question_message = bot.send_message(self.admin.user_id, message_text)
                 self.question_area = question_message.message_id
             else:
                 bot.edit_message_text(
-                    text=string_message,
+                    text=message_text,
                     chat_id=message.chat.id,
                     message_id=self.question_area
                 )
 
             for gamer in self:
-                bot.register_next_step_handler(start_msg, set_answer, gamer=gamer)
+                bot.register_next_step_handler(gamer.msg, set_answer, gamer=gamer)
 
             start_time = time.time()
             out_time = 10
@@ -95,13 +97,17 @@ class Session:
                     for gamer in self
                 ]
 
+                message_header = (f'Вопрос {num + 1}/{len(self.kahoot_file)}. '
+                                  f'({answered_gamers.count(True)}/{len(self.gamer_list)}) \n')
+                message_text = message_header + message_question + message_body
+
                 if all(answered_gamers):
                     break
 
                 if out_time != (10 - int(time.time() - start_time)):
                     out_time = 10 - int(time.time() - start_time)
                     bot.edit_message_text(
-                        text=f'{string_message}\nОставшееся время: {out_time}',
+                        text=f'{message_text}\nОставшееся время: {out_time}',
                         chat_id=message.chat.id,
                         message_id=self.question_area
                     )
@@ -128,7 +134,7 @@ class Session:
             self.admin.create_keyboard()
 
             bot.edit_message_text(
-                text=f'{string_message}\n\n{true_answer_string}',
+                text=f'{message_text}\n{true_answer_string}',
                 chat_id=message.chat.id,
                 message_id=self.question_area,
                 reply_markup=self.admin.keyboard,
