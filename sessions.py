@@ -90,6 +90,14 @@ class Session:
             out_time = 10
 
             while time.time() - start_time <= 10:
+                answered_gamers = [
+                    True if gamer.selected_option is not None else False
+                    for gamer in self
+                ]
+
+                if all(answered_gamers):
+                    break
+
                 if out_time != (10 - int(time.time() - start_time)):
                     out_time = 10 - int(time.time() - start_time)
                     bot.edit_message_text(
@@ -98,12 +106,22 @@ class Session:
                         message_id=self.question_area
                     )
 
-            answers = [options[gamer.selected_option] for gamer in self.gamer_list]
+            answers = []
+
+            for gamer in self:
+                if gamer.selected_option is not None:
+                    answers.append(
+                        options[gamer.selected_option]
+                    )
+
             true_answer_string = f'Правильный ответ: {task.correct_answer}\n'
 
             for sym, option in options.items():
                 stats = answers.count(option)
                 true_answer_string += f'За {option} ({sym}) проголосовали {stats}\n'
+
+            for gamer in self.gamer_list:
+                gamer.selected_option = None
 
             admin_action_waiting_event = threading.Event()
             self.admin.event = admin_action_waiting_event

@@ -1,7 +1,5 @@
 import telebot
 
-from next_step_handlers import next_question
-
 
 class User (object):
     def __init__(self, message):

@@ -56,7 +56,7 @@ def create_session(message):
             bot.send_message(message.chat.id, 'Ваша сессия уже существует!')
             return
 
-    session_id = f'{randint(100, 999)}-{randint(100, 999)}-{randint(100, 999)}'
+    session_id = f'{randint(100, 999)}'
     session = Session(session_id, admin)
     sessions.append(session)
 
@@ -96,7 +96,7 @@ def join_session(message):
 def input_session_id(message):
     resp = message.text
 
-    if fnmatch(str(resp), '???-???-???'):
+    if fnmatch(str(resp), '???'):
         for session in sessions:
             if session.session_id == str(resp):
                 gamer = Gamer(message)
