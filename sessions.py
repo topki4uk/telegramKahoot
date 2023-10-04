@@ -4,6 +4,8 @@ import time
 from next_step_handlers import set_answer, next_question
 from telebot import types, TeleBot
 from users import User, Admin
+from kahoot_bot import bot
+
 
 SYMBOLS = '🔺⚫⬜🔷'
 
@@ -48,7 +50,13 @@ class Session:
     def __iter__(self):
         return iter(self.gamer_list)
 
-    def start_game(self, bot: TeleBot, message):
+    @staticmethod
+    def find_session_by_admin(admin_id, sessions):
+        for session in sessions:
+            if str(session.admin.user_id) == str(admin_id):
+                return session
+
+    def start_game(self, message):
         gamer_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         gamer_markup.add(*[types.InlineKeyboardButton(char) for char in SYMBOLS])
 

@@ -7,14 +7,12 @@ from fnmatch import fnmatch
 
 from sessions import Session
 from serelize import KHTFile
-import os
-import ctypes
 
 from users import Gamer, Admin
+from kahoot_bot import bot
 
-token = os.environ.get('TELEGRAM_TOKEN')
+
 SYMBOLS = '🔺⚫⬜🔷'
-bot = TeleBot(token)
 sessions = []
 
 
@@ -37,6 +35,16 @@ def start_message(message):
 @bot.message_handler(commands=['function'])
 def some_message(message):
     bot.send_message(message.chat.id, 'Какое-то сообщение...')
+
+
+@bot.callback_query_handler(func=lambda q: q.data == 'text')
+def next_question(callback_query: telebot.types.CallbackQuery):
+    session = Session.find_session_by_admin(callback_query.from_user.id, sessions)
+
+    if session is not None:
+        session.admin.event.set()
+    else:
+        print('Not found!')
 
 
 @bot.message_handler(commands=['create_session'])
@@ -117,14 +125,8 @@ def start_game(message):
         bot.send_message(message.chat.id, 'Не найдены активные сессии!')
         return
 
-    game_thread = threading.Thread(target=session.start_game, args=(bot, message, ))
+    game_thread = threading.Thread(target=session.start_game, args=(message, ))
     game_thread.start()
-
-
-@bot.callback_query_handler(func=lambda q: q.data == 'text')
-def next_question(callback_query: telebot.types.CallbackQuery):
-    # ctypes.cast(int(callback_query.), ctypes.py_object).value.set()
-    ...
 
 
 @bot.message_handler(commands=['set_file'], content_types=['text', ])
@@ -133,8 +135,12 @@ def set_test_file(message: telebot.types.Message):
     bot.register_next_step_handler(msg, send_file)
 
 
-def send_file(message):
+def send_file(message: types.Message):
     resp = message.document
+
+    if message.content_type != 'document':
+        bot.send_message(message.chat.id, 'Это не файл!')
+        return
 
     if 'json' not in str(resp.file_name).rsplit('.', maxsplit=1):
         bot.send_message(message.chat.id, 'Неверное расширение файла!')

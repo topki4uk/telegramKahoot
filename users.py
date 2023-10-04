@@ -37,10 +37,7 @@ class Admin (User):
     def create_keyboard(self):
         self.keyboard = telebot.types.InlineKeyboardMarkup()
         button = telebot.types.InlineKeyboardButton('Следующий вопрос', callback_data='text')
-        j_button = {**button.to_dict(), 'event': id(self.event)}
-        self.keyboard.add(
-            telebot.types.InlineKeyboardButton().de_json(j_button)
-        )
+        self.keyboard.add(button)
 
 
 class Gamer (User):
