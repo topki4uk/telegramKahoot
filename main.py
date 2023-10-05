@@ -1,7 +1,7 @@
 import threading
 
 import telebot.types
-from telebot import TeleBot, types
+from telebot import types
 from random import randint
 from fnmatch import fnmatch
 
@@ -37,12 +37,55 @@ def some_message(message):
     bot.send_message(message.chat.id, 'Какое-то сообщение...')
 
 
-@bot.callback_query_handler(func=lambda q: q.data == 'text')
+@bot.callback_query_handler(func=lambda q: q.data == 'next')
 def next_question(callback_query: telebot.types.CallbackQuery):
     session = Session.find_session_by_admin(callback_query.from_user.id, sessions)
 
     if session is not None:
         session.admin.event.set()
+    else:
+        print('Not found!')
+
+
+@bot.callback_query_handler(func=lambda q: q.data == 'end')
+def end_game(callback_query: telebot.types.CallbackQuery):
+    session = Session.find_session_by_admin(callback_query.from_user.id, sessions)
+
+    if session is not None:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+        create = types.KeyboardButton("/create_session")
+        session_info_button = types.KeyboardButton('/get_session_info')
+        add_file_button = types.KeyboardButton('/set_file')
+        join_button = types.KeyboardButton('/join_session')
+        start_game_button = types.KeyboardButton('/start_game')
+
+        markup.add(create, session_info_button,
+                   add_file_button, join_button, start_game_button)
+
+        for gamer in *session, session.admin:
+            bot.send_message(gamer.user_id, 'Игра была завершена!', reply_markup=markup)
+
+        sessions.remove(session)
+    else:
+        print('Not found!')
+
+
+@bot.callback_query_handler(func=lambda q: q.data == 'scores')
+def get_scores(callback_query: telebot.types.CallbackQuery):
+    session = Session.find_session_by_admin(callback_query.from_user.id, sessions)
+    score_message = 'Таблица лучших игроков:\n'
+
+    if session is not None:
+        for i, gamer in enumerate(session):
+            score_message += f' {i+1}. {gamer}: {gamer.score} (+{gamer.score_growth})\n'
+
+        bot.edit_message_text(
+            score_message,
+            session.admin.user_id,
+            session.question_area,
+            reply_markup=session.admin.keyboard
+        )
     else:
         print('Not found!')
 

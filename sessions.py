@@ -1,9 +1,8 @@
 import threading
-from random import randint
 import time
-from next_step_handlers import set_answer, next_question
-from telebot import types, TeleBot
-from users import User, Admin
+from next_step_handlers import set_answer
+from telebot import types
+from users import Admin, Gamer
 from kahoot_bot import bot
 
 
@@ -15,7 +14,7 @@ class Session:
             self,
             session_id,
             admin: Admin,
-            gamer_list: list[User] = None
+            gamer_list: list[Gamer] = None
     ):
         self.session_id = session_id
         self.admin = admin
@@ -66,6 +65,10 @@ class Session:
             bot.register_next_step_handler(msg, set_answer, gamer=gamer)
 
         for num, task in enumerate(self.kahoot_file):
+            for gamer in self.gamer_list:
+                gamer.selected_option = None
+                gamer.score_growth = 0
+
             message_header = f'Вопрос {num + 1}/{len(self.kahoot_file)}. (0/{len(self.gamer_list)}) \n'
             message_question = f'{task.question}\n'
             options = dict(zip(SYMBOLS, task.options))
@@ -92,10 +95,18 @@ class Session:
             out_time = 10
 
             while time.time() - start_time <= 10:
-                answered_gamers = [
-                    True if gamer.selected_option is not None else False
-                    for gamer in self
-                ]
+                answered_gamers = []
+
+                for gamer in self:
+                    if gamer.selected_option is not None:
+
+                        if gamer.answer_time is None:
+                            gamer.answer_time = round(10 - (time.time() - start_time), 3)
+
+                        answered_gamers.append(True)
+
+                    else:
+                        answered_gamers.append(False)
 
                 message_header = (f'Вопрос {num + 1}/{len(self.kahoot_file)}. '
                                   f'({answered_gamers.count(True)}/{len(self.gamer_list)}) \n')
@@ -116,9 +127,13 @@ class Session:
 
             for gamer in self:
                 if gamer.selected_option is not None:
-                    answers.append(
-                        options[gamer.selected_option]
-                    )
+                    selected_option = options[gamer.selected_option]
+
+                    if task.correct_answer == selected_option:
+                        gamer.score_growth = int(1000 * (1 + (gamer.answer_time / 10)))
+                        gamer.score += gamer.score_growth
+
+                    answers.append(selected_option)
 
             true_answer_string = f'Правильный ответ: {task.correct_answer}\n'
 
@@ -126,13 +141,7 @@ class Session:
                 stats = answers.count(option)
                 true_answer_string += f'За {option} ({sym}) проголосовали {stats}\n'
 
-            for gamer in self.gamer_list:
-                gamer.selected_option = None
-
-            admin_action_waiting_event = threading.Event()
-            self.admin.event = admin_action_waiting_event
             self.admin.create_keyboard()
-
             bot.edit_message_text(
                 text=f'{message_text}\n{true_answer_string}',
                 chat_id=message.chat.id,
@@ -140,20 +149,6 @@ class Session:
                 reply_markup=self.admin.keyboard,
             )
 
+            admin_action_waiting_event = threading.Event()
+            self.admin.event = admin_action_waiting_event
             admin_action_waiting_event.wait()
-
-
-def main():
-    admin = User('1', 'ADMIN', 'name')
-    session = Session('1', admin)
-
-    for i in range(10):
-        user = User(randint(1, 1000), 'default', f'user{i}')
-        session += user
-
-    for user in session:
-        print(user.user_id)
-
-
-if __name__ == '__main__':
-    main()
